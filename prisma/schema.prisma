@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  User
+  Admin
+}
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  role          Role      @default(User)
+  payments      Payment[]
+  cart          Cart[]
+  ticket        Ticket[]
+  address       Address[]
+}
+
+model Product {
+  id            String          @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  categoryName  String
+  category      Category        @relation(fields: [categoryName], references: [name])
+  image         String
+  price         BigInt
+  quantity      Int
+  spec          String?
+  desc          String
+  slug          String          @unique
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime?
+  cart          Cart[]
+  PaymentDetail PaymentDetail[]
+  Ticket        Ticket[]
+
+  @@index([categoryName])
+}
+
+model Category {
+  id       String    @id @default(auto()) @map("_id") @db.ObjectId
+  name     String    @unique
+  products Product[]
+}
+
+model Address {
+  id       String    @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  phone    String
+  home     String
+  province String
+  district String
+  ward     String
+  Payment  Payment[]
+  user     User      @relation(fields: [userId], references: [id])
+  userId   String    @db.ObjectId
+
+  @@index([userId])
+}
+
+enum PAYMENT_STATUS {
+  PENDING
+  SUCCESS
+  ERROR
+}
+
+model Payment {
+  id             String           @id @default(auto()) @map("_id") @db.ObjectId
+  paymentGId     String?
+  orderId        String?
+  status         PAYMENT_STATUS
+  user           User             @relation(fields: [userId], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  userId         String           @db.ObjectId
+  paymentDetails PaymentDetail[]
+  totalAmount    BigInt?
+  Ticket         Ticket[]
+  shippingStatus SHIPPING_STATUS? @default(PENDING)
+  addressId      String           @db.ObjectId
+  address        Address          @relation(fields: [addressId], references: [id])
+
+  @@index([addressId])
+  @@index([userId])
+}
+
+model PaymentDetail {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  cartQuantity Int
+  product      Product  @relation(fields: [productId], references: [id])
+  productId    String   @db.ObjectId
+  payment      Payment? @relation(fields: [paymentId], references: [id])
+  paymentId    String?  @db.ObjectId
+
+  @@index([paymentId])
+  @@index([productId])
+}
+
+model Cart {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+  product      Product  @relation(fields: [productId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  productId    String   @db.ObjectId
+  userId       String   @db.ObjectId
+  cartQuantity Int
+
+  @@index([productId])
+  @@index([userId])
+}
+
+enum SHIPPING_STATUS {
+  PENDING
+  DELIVERY
+  DELIVERED
+}
+
+enum TICKET_STATUS {
+  PENDING
+  ACCEPTED
+  DENIED
+  COMPLETED
+}
+
+model TicketIssue {
+  id     String   @id @default(auto()) @map("_id") @db.ObjectId
+  name   String   @unique
+  ticket Ticket[]
+}
+
+model Ticket {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  user            User           @relation(fields: [userId], references: [id])
+  userId          String         @db.ObjectId
+  status          TICKET_STATUS? @default(PENDING)
+  payment         Payment        @relation(fields: [paymentId], references: [id])
+  paymentId       String         @db.ObjectId
+  product         Product        @relation(fields: [productId], references: [id])
+  productId       String         @db.ObjectId
+  ticketIssue     TicketIssue?   @relation(fields: [ticketIssueName], references: [name])
+  ticketIssueName String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  desc            String
+  note            String?
+
+  @@index([productId])
+  @@index([paymentId])
+  @@index([userId])
+  @@index([ticketIssueName])
+}
